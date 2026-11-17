@@ -116,3 +116,41 @@ Valeurs de départ tirées de ce TP (un seul scan, une seule application). Le no
 | Délai médian de correction | Médiane de (date de vérification − date de détection) sur les fiches fermées du trimestre | Fiches de traitement | Mensuelle | Responsable sécurité applicative | Ajuster les échéances par priorité, ou les moyens si elles sont irréalistes | Pas encore mesurable |
 | Couverture DAST des applications critiques | Applications critiques avec au moins un scan réussi dans les 30 derniers jours, sur toutes les applications critiques | Inventaire des applications + historique des pipelines | Mensuelle | Équipe sécurité | Prioriser l'ajout du job DAST dans les projets non couverts | 1 / 1 (le labo) |
 | Taux d'échec technique des scans | Jobs `dast_zap` en échec hors alertes (application qui ne démarre pas, ZAP qui plante), sur tous les jobs lancés | Historique GitHub Actions | Mensuelle | Exploitation | Fiabiliser le pipeline avant d'en tirer des chiffres | À mesurer sur les prochains runs |
+
+## Réponses aux questions
+
+### Partie 1
+
+**Q1. Pourquoi démarrer et vérifier l'application avant de lancer ZAP ?** ZAP ne lit pas le code, il interroge le serveur. Si l'application ne répond pas, ou répond par une erreur, le spider ne trouve rien et le rapport est vide ; on risquerait de prendre ce rapport vide pour un résultat propre. Ici, la vérification a aussi montré que le serveur ne parlait que HTTPS, ce qui a changé la cible du scan.
+
+**Q2. Pourquoi ne pas exposer le port MongoDB à l'hôte ?** L'application joint `db` par le réseau interne de Compose, elle n'a pas besoin du port publié. Publier 27017 ajoute une surface d'attaque, avec des identifiants triviaux (`username` / `password` dans le Compose), et sur certaines configurations Docker le port contourne le pare-feu de l'hôte. J'ai vérifié que `localhost:27017` est fermé et que l'application se connecte toujours à la base.
+
+### Questions de compréhension
+
+1. **SAST et DAST.** Le SAST (SonarQube) lit le code sans l'exécuter : il voit tous les chemins, y compris ceux qu'aucun utilisateur n'atteint, mais pas la configuration réelle du serveur. Le DAST (ZAP) parle à l'application en marche, comme un client HTTP : il voit ce que le serveur renvoie vraiment, mais seulement sur les pages qu'il atteint.
+2. **Pourquoi une application en fonctionnement ?** Parce que ZAP n'a pas d'autre matière que les requêtes et les réponses. Le mode debug de TIWAP, par exemple, ne se voit qu'à l'exécution : rien dans le code ne dit si on le lance en production avec `debug=True`.
+3. **Pourquoi `http://app:5000` ?** Dans un conteneur, `localhost` désigne le conteneur lui-même. Compose crée un réseau où chaque service est joignable par son nom, et le DNS interne résout `app` vers le conteneur de TIWAP. Ici c'était `https://app:5000`, le serveur ne parlant que TLS.
+4. **Passif et actif.** Le scan passif observe le trafic généré par l'exploration et en tire des constats (en-têtes, cookies, fuites). Le scan actif envoie des charges d'attaque (injections, XSS) ; il peut modifier des données ou faire tomber l'application, d'où un périmètre autorisé et un environnement préparé.
+5. **Pourquoi le Baseline ne garantit pas de trouver une injection SQL ?** Il n'injecte rien : une injection ne se révèle que si l'on envoie une entrée piégée et qu'on compare la réponse. Il faudrait en plus atteindre la page vulnérable ; dans TIWAP, elles sont derrière le login et le scan n'était pas authentifié. Résultat : aucune alerte d'injection dans notre rapport.
+6. **Alerte et vulnérabilité confirmée.** Une alerte est un constat de l'outil, avec son niveau de confiance. Elle devient une vulnérabilité confirmée quand quelqu'un l'a rejouée et a établi l'impact. L'alerte 10099 parlait de « SQL » ; la vérification a montré une fuite d'information par le debugger, pas une injection.
+7. **Prioriser sur une application critique.** On part du risque ZAP, puis on le corrige selon le contexte : exposition (Internet ou interne), données touchées, facilité d'exploitation (faut-il un compte ?), mesures compensatoires (WAF, proxy), coût de correction. Le debug Werkzeug, « moyen » pour ZAP, passe en critique : il est exploitable sans compte et se corrige en une ligne.
+8. **Pourquoi conserver les rapports en CI ?** Pour comparer deux scans et prouver qu'une correction a tenu, pour garder une trace d'audit liée à un commit, et pour ne pas mettre les rapports dans le dépôt : ils décrivent les failles de l'application et doivent rester réservés à l'équipe.
+9. **Éviter de publier une application vulnérable.** Lier les ports à `127.0.0.1`, ne pas publier la base, faire tourner les scans sur des runners ou des réseaux isolés, détruire l'environnement après le job (`docker compose down -v`), et ne jamais déployer TIWAP avec un pipeline de production.
+10. **Indicateurs d'efficacité.** Ceux qui mesurent le traitement plutôt que le volume : délai médian de correction, vulnérabilités prioritaires en retard, pourcentage de corrections vérifiées par un nouveau scan, couverture des applications critiques. Voir le tableau ci-dessus.
+
+## Conclusion
+
+Le scan de référence a trouvé en deux minutes un défaut que SonarQube n'avait pas classé comme grave : le serveur de développement Flask tourne en debug et affiche son code, avec une console Python, à quiconque rate son login. Il a aussi listé les en-têtes absents, des constats sûrs mais de faible impact seuls.
+
+Il n'a vu ni l'injection SQL ni la XSS du TP2. Il était passif, non authentifié, et il n'a exploré que la page de login. Une absence d'alerte ne dit donc rien sur les pages derrière le login.
+
+Les deux outils couvrent des angles différents : le SAST lit tout le code mais pas le serveur, le DAST voit le serveur réel mais seulement ce qu'il atteint. Pour NOVA SERVICES, aucun des deux ne garantit la sécurité ; leurs rapports servent à ouvrir des fiches, à les prioriser et à vérifier les corrections. La suite logique serait un scan authentifié, puis un scan actif sur un environnement de recette.
+
+## Nettoyage
+
+```bash
+podman compose down
+podman compose ps
+```
+
+Le volume MongoDB peut être gardé : il ne contient que les données de démonstration de TIWAP.
