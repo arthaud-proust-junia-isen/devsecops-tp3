@@ -64,3 +64,22 @@ Pour l'en-tête CSP (question 8.3) :
 - le scan n'est pas authentifié, alors que les pages vulnérables (`/sqli/low`, etc.) sont derrière le login. Le spider n'a vu que `/`, `/login` et les fichiers statiques.
 
 SonarQube ne l'avait pas trouvée non plus (pas d'analyse de propagation dans l'édition Community). C'est la revue de code du TP2 qui l'a confirmée, avec un test unitaire. Les deux outils se complètent quand même : ZAP a montré ce que SonarQube ne voit pas (le comportement réel du serveur en debug, les en-têtes renvoyés), et SonarQube voit le code que ZAP n'atteint pas. Pour confirmer une injection en dynamique, il faudrait un scan actif authentifié, ou une approche IAST qui observe l'application de l'intérieur pendant les tests.
+
+## Priorisation pour NOVA SERVICES
+
+L'ordre de ZAP ne convient pas tel quel. Le mode debug arrive en « moyen » et « faible », alors que c'est le seul constat qui mène à l'exécution de code ; les en-têtes manquants, eux, ont un impact limité tant qu'il n'y a pas de XSS à exploiter. Les priorités ci-dessous supposent une application NOVA exposée à ses clients, avec des données personnelles.
+
+| Champ | Debug Werkzeug actif | En-têtes de sécurité absents | Pas de jeton anti-CSRF |
+| --- | --- | --- | --- |
+| Référence | ZAP 10099 + 90022, `POST /login` | ZAP 10038, 10020, 10021, 90004, 10063 | ZAP 10202, formulaire `/` (et SonarQube python:S4502) |
+| Application | TIWAP, cible de laboratoire | TIWAP, cible de laboratoire | TIWAP, cible de laboratoire |
+| Actif métier analogue | Portail client NOVA, même stack Flask | Toutes les applications web NOVA | Portail client et back-office des prestations |
+| Impact | Fuite du code et des chemins internes ; la console Python, si son PIN est deviné ou calculé, donne l'exécution de code sur le serveur (confidentialité, intégrité, disponibilité) | Une XSS existante devient exploitable sans restriction ; la page peut être encadrée pour du clickjacking | Un site tiers peut faire envoyer des formulaires par un utilisateur connecté (modification de données) |
+| Priorité | **Critique** : exploitable sans compte, depuis la page de login, correction triviale | **Moyenne** : pas exploitable seule, mais amplifie les XSS déjà relevées au TP2 | **Élevée** sur les formulaires authentifiés, faible sur le login seul |
+| Responsable | Développement (code), exploitation (configuration de lancement) | Exploitation (reverse proxy), développement pour la CSP | Développement |
+| Échéance | 18/11/2026 (24 h) | 01/12/2026 | 15/12/2026 |
+| Action | Retirer `debug=True`, servir avec gunicorn ; traiter `fetchone() is None` dans `check_login` | Ajouter les en-têtes au reverse proxy ; écrire une CSP adaptée aux scripts de l'application | Réactiver `CSRFProtect` de Flask-WTF et ajouter `{{ csrf_token() }}` aux formulaires |
+| Vérification | Nouveau scan : 10099 et 90022 absents ; `curl` du login inconnu doit renvoyer « Invalid Credentials » en 200 | Nouveau scan : alertes d'en-têtes absentes ; `curl -I` | Nouveau scan (10202 absent) et test : un POST sans jeton est refusé (400) |
+| Statut | Ouvert | Ouvert | Ouvert |
+
+Dans le labo lui-même, ces trois défauts sont acceptés : TIWAP est vulnérable exprès et n'écoute que sur `127.0.0.1`.
