@@ -1,0 +1,66 @@
+name: DAST ZAP
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dast_zap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Démarrer TIWAP et ZAP
+        run: |
+          # ZAP tourne en uid 1000 et doit pouvoir écrire dans le dossier monté
+          rm -f reports/zap-report.*
+          chmod 777 reports
+          docker compose up -d --build
+
+      - name: Attendre que TIWAP réponde
+        run: |
+          for i in $(seq 1 30); do
+            curl -skf -o /dev/null https://localhost:5000/ && exit 0
+            sleep 5
+          done
+          docker compose logs --tail=100 app
+          exit 1
+
+      - name: Scan de référence
+        # -I : les avertissements ne font pas échouer le job, seules les règles en FAIL le feraient
+        run: |
+          docker compose exec -T zap zap-baseline.py \
+            -t https://app:5000 -m 2 -I \
+            -r zap-report.html -J zap-report.json
+
+      - name: Résumé
+        if: ${{ !cancelled() }}
+        run: |
+          {
+            echo "## ZAP Baseline : TIWAP (${GITHUB_REF_NAME})"
+            echo
+            echo "| Règle | Alerte | Risque (confiance) | Instances |"
+            echo "|---|---|---|---|"
+            jq -r '.site[].alerts[] | "| \(.pluginid) | \(.name) | \(.riskdesc) | \(.count) |"' reports/zap-report.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: zap-rapports
+          path: |
+            reports/zap-report.html
+            reports/zap-report.json
+
+      - name: Journaux en cas d'échec
+        if: ${{ failure() }}
+        run: docker compose logs --tail=100
+
+      - name: Arrêter les services
+        if: ${{ always() }}
+        run: docker compose down -v

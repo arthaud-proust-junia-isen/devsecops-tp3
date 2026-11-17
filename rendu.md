@@ -83,3 +83,23 @@ L'ordre de ZAP ne convient pas tel quel. Le mode debug arrive en « moyen » et 
 | Statut | Ouvert | Ouvert | Ouvert |
 
 Dans le labo lui-même, ces trois défauts sont acceptés : TIWAP est vulnérable exprès et n'écoute que sur `127.0.0.1`.
+
+## Intégration continue
+
+Le sujet laisse le choix entre GitLab CI et GitHub Actions. J'ai pris GitHub Actions, comme pour le TP2 : [.github/workflows/dast-zap.yml](.github/workflows/dast-zap.yml).
+
+Le job `dast_zap` tourne à chaque push, sur toutes les branches, et sur les pull requests :
+
+1. il démarre `app`, `db` et `zap` avec le même `docker-compose.yml` qu'en local ;
+2. il attend que `https://localhost:5000` réponde (30 essais de 5 s), et affiche les journaux de l'application sinon ;
+3. il lance le scan de référence avec `-I` : les avertissements ne cassent pas le build, seules des règles passées en FAIL le feraient ;
+4. il écrit le tableau des alertes dans le résumé du run et publie les rapports HTML et JSON en artefact `zap-rapports` ;
+5. il arrête tout avec `docker compose down -v`, même en cas d'échec.
+
+Le runner ne publie rien : le port 5000 reste lié à `127.0.0.1` de la machine virtuelle, détruite à la fin du job.
+
+Limites :
+
+- le job ne bloque rien pour l'instant. Pour bloquer, il faudrait un fichier de règles (`-c`) qui passe en FAIL les alertes qualifiées, par exemple 10099 et 90022 ;
+- l'artefact n'alimente aucun tableau de bord de vulnérabilités. GitHub attend du SARIF pour son onglet *Code scanning*, GitLab un rapport DAST dans son propre format ;
+- le scan n'est pas authentifié, comme en local.
