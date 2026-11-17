@@ -4,6 +4,10 @@
 
 Pas besoin d'exposer le service db, théoriquement le container app peut communiquer avec db sans que ce dernier ouvre ses ports. En pratique, cela se vérifie : localhost:27017 n'est pas accessible depuis l'host; le site localhost:5000 peut se connecter à la DB (logs de connexion visible et authentifications possible).
 
+Une fois connecté avec `admin`, le tableau de bord de TIWAP s'affiche sur `https://localhost:5000` :
+
+![Tableau de bord de TIWAP sur localhost:5000, après connexion](reports/capture-tiwap.png)
+
 ## Ajout de Zap
 
 La commande fournie échoue car http n'est pas supporté par le serveur, et les chemins de sortie sont incorrects.
