@@ -103,3 +103,16 @@ Limites :
 - le job ne bloque rien pour l'instant. Pour bloquer, il faudrait un fichier de règles (`-c`) qui passe en FAIL les alertes qualifiées, par exemple 10099 et 90022 ;
 - l'artefact n'alimente aucun tableau de bord de vulnérabilités. GitHub attend du SARIF pour son onglet *Code scanning*, GitLab un rapport DAST dans son propre format ;
 - le scan n'est pas authentifié, comme en local.
+
+## Indicateurs de pilotage
+
+Valeurs de départ tirées de ce TP (un seul scan, une seule application). Le nombre brut d'alertes n'y figure pas : 18 alertes aujourd'hui, 25 demain avec un scan authentifié, cela voudrait dire une meilleure couverture, pas une application moins sûre.
+
+| Indicateur | Définition et calcul | Source | Fréquence | Responsable | Décision permise | Valeur TIWAP |
+| --- | --- | --- | --- | --- | --- | --- |
+| Vulnérabilités confirmées ouvertes, par priorité | Nombre de fiches au statut « ouvert » ou « en cours », regroupées par priorité | Fiches de traitement (tickets) | Hebdomadaire | Équipe sécurité | Réaffecter des développeurs quand le stock critique ou élevé ne baisse pas | 1 critique, 1 élevée, 1 moyenne |
+| Vulnérabilités prioritaires en retard | Fiches critiques ou élevées dont l'échéance est dépassée, sur le total des critiques et élevées | Fiches de traitement | Hebdomadaire | Responsable sécurité applicative | Escalader au management ; bloquer la mise en production concernée | 0 / 2 (échéances non atteintes) |
+| Corrections vérifiées par un nouveau scan | Fiches « corrigé » dont l'alerte a disparu au scan suivant, sur toutes les fiches « corrigé » | Fiches + rapports JSON de la CI | À chaque pipeline | Équipe de développement | Rouvrir une fiche dont la correction n'a pas tenu | Pas encore mesurable (aucune correction) |
+| Délai médian de correction | Médiane de (date de vérification − date de détection) sur les fiches fermées du trimestre | Fiches de traitement | Mensuelle | Responsable sécurité applicative | Ajuster les échéances par priorité, ou les moyens si elles sont irréalistes | Pas encore mesurable |
+| Couverture DAST des applications critiques | Applications critiques avec au moins un scan réussi dans les 30 derniers jours, sur toutes les applications critiques | Inventaire des applications + historique des pipelines | Mensuelle | Équipe sécurité | Prioriser l'ajout du job DAST dans les projets non couverts | 1 / 1 (le labo) |
+| Taux d'échec technique des scans | Jobs `dast_zap` en échec hors alertes (application qui ne démarre pas, ZAP qui plante), sur tous les jobs lancés | Historique GitHub Actions | Mensuelle | Exploitation | Fiabiliser le pipeline avant d'en tirer des chiffres | À mesurer sur les prochains runs |
