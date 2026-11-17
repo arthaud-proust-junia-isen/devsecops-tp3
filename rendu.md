@@ -102,6 +102,8 @@ Le job `dast_zap` tourne à chaque push, sur toutes les branches, et sur les pul
 
 Premier run : [44071276318](https://github.com/arthaud-proust-junia-isen/devsecops-tp3-zap/actions/runs/44071276318), vert en 1 min 58. On y retrouve les mêmes constats qu'en local (15 règles en WARN, 0 en FAIL), dont l'erreur 500 du login (90022).
 
+![Run GitHub Actions du job dast_zap : statut, artefact zap-rapports et tableau des alertes](reports/capture-ci.png)
+
 Le runner ne publie rien : le port 5000 reste lié à `127.0.0.1` de la machine virtuelle, détruite à la fin du job.
 
 Limites :
