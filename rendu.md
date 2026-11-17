@@ -153,4 +153,4 @@ podman compose down
 podman compose ps
 ```
 
-Le volume MongoDB peut être gardé : il ne contient que les données de démonstration de TIWAP.
+Il n'y a rien à sauvegarder côté base : MongoDB n'a pas de volume nommé et ne contient que les données de démonstration de TIWAP.
