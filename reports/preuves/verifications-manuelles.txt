@@ -1,0 +1,18 @@
+$ curl -sk -D - -o /dev/null https://localhost:5000/
+HTTP/1.0 200 OK
+Content-Type: text/html; charset=utf-8
+Content-Length: 2709
+Server: Werkzeug/2.0.3 Python/3.6.15
+Date: Mon, 16 Nov 2026 21:20:24 GMT
+
+$ curl -sk -X POST -d "username=inconnu&password=x" https://localhost:5000/login
+HTTP 500
+extraits de la page d'erreur :
+TypeError: &#x27;NoneType&#x27; object is not subscriptable // Werkzeug Debugger
+File &quot;/app/app.py&quot;, line 67, in login
+File &quot;/app/helper/db_manager.py&quot;, line 45, in check_login
+SELECT username, password FROM users WHERE username = ?&quot;, (username,))
+EVALEX = true
+$ curl -sk https://localhost:5000/console
+HTTP 200
+console is locked and needs to be unlocked by entering the PIN.
